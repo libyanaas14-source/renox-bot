@@ -75,7 +75,7 @@ class DiscordBot(commands.Bot):
 
     async def on_ready(self) -> None:
         if self.user is not None:
-            logging.info("Logged in as %s (ID: %s)", self.user, self.user.id
+            logging.info("Logged in as %s (ID: %s)", self.user, self.user.id) 
 
 
 bot = DiscordBot()
