@@ -1,11 +1,11 @@
 import asyncio
-
 import json
 import logging
 import os
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta 
+from dataclasses import dataclass
 from pathlib import Path
 from threading import Thread
 
