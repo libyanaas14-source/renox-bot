@@ -1,4 +1,5 @@
 import asyncio
+
 import json
 import logging
 import os
@@ -11,7 +12,8 @@ from threading import Thread
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
+import sqlite3 
 from flask import Flask, jsonify
 
 
@@ -366,6 +368,189 @@ async def add_balance(
         f"تمت إضافة **{amount:,} رينو** إلى {member.mention}. "
         f"رصيده الجديد: **{new_balance:,} رينو**."
     )
+
+
+# ==========================================
+# نظام الترقيات والـ TOP اليومي للإدارة
+# =========================================
+
+ADMIN_ROLE_ID = 1537274972597260379  # ضع هنا ID رتبة الإدارة
+
+# ترتيب الـ 41 رتبة بالترتيب الفعلي (من الأقل للأعلى)
+STAFF_ROLES_ORDER = [1537274972597260379,
+    1537274242909868085,
+    1537275238885359636,
+    1537275451209158656,
+    1537275663503855696,
+    1537276083907465337,
+    1537276300404985896,
+    1537276853658718229,
+    1537277669492920460,
+    1537278347120214138,
+    1537279054724595794,
+    1537282990672187522,
+    1537283287318274188,
+    1537283780497113181,
+    1537287444943339560,
+    1537287340131614791,
+    1537287147567194132,
+    1537287030571147264,
+    1537286917098573855,
+    1537286787746111518,
+    1537286692820619274,
+    1537286574994362398,
+    1537286410065678428,
+    1537286276146004090,
+    1537275451209158656,
+    1537286049108205728,
+    1537285923971010670,
+    1537285722887954512,
+    1537285604570824815,
+    1537285461666431077,
+    1537285297220485230,
+    1537285183953440900,
+    1537285070883258379,
+    1537284815727099985,
+    1537284679127015504,
+    1537284582611882075,
+    1537468075379523654,
+    1537284292189626458,
+    1537283268796354590,
+    1537283064965627995,
+    1537282925115088906,
+    1537282688560533654,
+    1537282379293663373,
+    1537277669492920460,
+    1537281951705211010,
+    1537281806586478652,
+    1537281536498606150,
+    1537281235951419434,
+    1537280175509872640,
+    1537279895011459153,
+    1537279625707782265,
+    1537279087389843467,
+    1537278719553568768,
+    1537278304338321528,
+    1537277782487203940
+
+
+    # ضع الـ IDs للـ 41 رتبة هنا مفصولة بفواصل
+]
+
+def get_max_rank_index(total_messages):
+    rank = 0
+    messages = total_messages
+    tiers = [(7, 150), (9, 200), (8, 250), (14, 300), (3, 500)]
+    for count, cost in tiers:
+        for _ in range(count):
+            if messages >= cost:
+                messages -= cost
+                rank += 1
+            else:
+                return rank
+    return rank
+
+def init_staff_db():
+    conn = sqlite3.connect("admin_system.db")
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS staff_stats 
+                 (user_id INTEGER PRIMARY KEY, total_messages INTEGER, promotions_given INTEGER)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS daily_leaderboard 
+                 (user_id INTEGER PRIMARY KEY, daily_messages INTEGER)''')
+    conn.commit()
+    conn.close()
+
+init_staff_db()
+
+@bot.event
+async def on_message(message):
+    if message.author.bot or not message.guild:
+        return
+    
+    admin_role = message.guild.get_role(ADMIN_ROLE_ID)
+    if admin_role and admin_role in message.author.roles:
+        conn = sqlite3.connect("admin_system.db")
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO staff_stats (user_id, total_messages, promotions_given) VALUES (?, COALESCE((SELECT total_messages+1 FROM staff_stats WHERE user_id=?), 1), COALESCE((SELECT promotions_given FROM staff_stats WHERE user_id=?), 0))", (message.author.id, message.author.id, message.author.id))
+        c.execute("INSERT OR REPLACE INTO daily_leaderboard (user_id, daily_messages) VALUES (?, COALESCE((SELECT daily_messages+1 FROM daily_leaderboard WHERE user_id=?), 1))", (message.author.id, message.author.id))
+        conn.commit()
+        conn.close()
+    
+    await bot.process_commands(message)
+
+@tasks.loop(time=datetime.time(hour=4, minute=0))
+async def reset_daily_top():
+    conn = sqlite3.connect("admin_system.db")
+    conn.execute("DELETE FROM daily_leaderboard")
+    conn.commit()
+    conn.close()
+
+reset_daily_top.start()
+
+# أمر /roll
+@bot.tree.command(name="roll", description="ترقية إداري بناءً على عدد رسائله")
+@app_commands.describe(promotions="عدد الترقيات المطلوب إعطاؤها", member="الإداري المراد ترقيته")
+async def roll_cmd(interaction: discord.Interaction, promotions: int, member: discord.Member):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("ليس لديك صلاحية استخدام هذا الأمر.", ephemeral=True)
+    
+    conn = sqlite3.connect("admin_system.db")
+    c = conn.cursor()
+    c.execute("SELECT total_messages, promotions_given FROM staff_stats WHERE user_id=?", (member.id,))
+    row = c.fetchone()
+    
+    if not row:
+        return await interaction.response.send_message(f"{member.mention} ليس لديه أي رسائل مسجلة بعد.", ephemeral=True)
+    
+    total_messages, given = row
+    max_eligible = get_max_rank_index(total_messages)
+    can_give = max_eligible - given
+    to_give = min(promotions, can_give)
+    
+    if to_give <= 0:
+        return await interaction.response.send_message(f"{member.mention} لا يستحق ترقيات جديدة حالياً.", ephemeral=True)
+
+    current_rank_index = -1
+    for i, rid in enumerate(STAFF_ROLES_ORDER):
+        if interaction.guild.get_role(rid) in member.roles:
+            current_rank_index = i
+        
+    added = []
+    for i in range(current_rank_index + 1, current_rank_index + 1 + to_give):
+        if i < len(STAFF_ROLES_ORDER):
+            role = interaction.guild.get_role(STAFF_ROLES_ORDER[i])
+            if role:
+                await member.add_roles(role)
+                added.append(role.mention)
+            
+    c.execute("UPDATE staff_stats SET promotions_given = promotions_given + ? WHERE user_id=?", (to_give, member.id))
+    conn.commit()
+    conn.close()
+    
+    await interaction.response.send_message(f"🎉 تمت ترقية {member.mention} بـ `{to_give}` رتب بنجاح!")
+
+# أمر /top
+@bot.tree.command(name="top", description="عرض قائمة أفضل 10 إداريين اليوم")
+async def top_cmd(interaction: discord.Interaction):
+    conn = sqlite3.connect("admin_system.db")
+    c = conn.cursor()
+    c.execute("SELECT user_id, daily_messages FROM daily_leaderboard ORDER BY daily_messages DESC LIMIT 10")
+    data = c.fetchall()
+    conn.close()
+    
+    if not data:
+        return await interaction.response.send_message("لا يوجد نشاط للإداريين اليوم حتى الآن.", ephemeral=True)
+    
+    embed = discord.Embed(title="🏆 TOP الإداريين اليومي", color=discord.Color.gold())
+    desc = ""
+    for i, (uid, msg) in enumerate(data, 1):
+        mem = interaction.guild.get_member(uid)
+        name = mem.display_name if mem else f"عضو ({uid})"
+        desc += f"**{i}.** {name} — `{msg}` رسالة\n"
+    
+    embed.description = desc
+    await interaction.response.send_message(embed=embed)
+
 
 
 def main() -> None:
