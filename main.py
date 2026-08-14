@@ -68,11 +68,11 @@ class DiscordBot(commands.Bot):
             command_prefix=commands.when_mentioned,
             intents=intents,
         )
-
-    async def setup_hook(self) -> None:
+        async def setup_hook(self) -> None:
         """Sync slash commands when the bot connects."""
-       synced_commands = await self.tree.sync()
-        logging.info("Synced %d command(s) globally", len(synced_commands)) 
+        synced_commands = await self.tree.sync()
+        logging.info("Synced %d command(s) globally", len(synced_commands))
+    
     
 
     async def on_ready(self) -> None:
