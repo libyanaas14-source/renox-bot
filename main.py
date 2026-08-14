@@ -71,21 +71,8 @@ class DiscordBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         """Sync slash commands when the bot connects."""
-        guild_id = os.getenv("DISCORD_GUILD_ID")
-
-        if guild_id:
-            try:
-                guild = discord.Object(id=int(guild_id))
-            except ValueError as error:
-                raise ValueError("DISCORD_GUILD_ID must be a numeric Discord server ID") from error
-
-            self.tree.copy_global_to(guild=guild)
-            synced_commands = await self.tree.sync(guild=guild)
-            logging.info("Synced %d command(s) to Discord server %s", len(synced_commands), guild_id)
-            return
-
         synced_commands = await self.tree.sync()
-        logging.info("Synced %d command(s) globally", len(synced_commands))
+        logging.info("Synced %d command(s) globally",
 
     async def on_ready(self) -> None:
         if self.user is not None:
