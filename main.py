@@ -69,9 +69,10 @@ class DiscordBot(commands.Bot):
             intents=intents,
         )
 
-    async def setup_hook(self) -> None:
+        async def setup_hook(self) -> None:
+        reset_daily_top.start()  # تشغيل المهمة المجدولة هنا في المكان الصح
         synced_commands = await self.tree.sync()
-        logging.info("Synced %d command(s) globally", len(synced_commands))
+        logging.info("Synced %d command(s) globally", len(synced_commands)) 
 
     async def on_ready(self) -> None:
         if self.user is not None:
@@ -471,7 +472,6 @@ async def reset_daily_top():
     conn.commit()
     conn.close()
 
-reset_daily_top.start()
 
 # أمر /roll
 @bot.tree.command(name="roll", description="ترقية إداري بناءً على عدد رسائله")
