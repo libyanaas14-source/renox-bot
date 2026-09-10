@@ -19,7 +19,7 @@ from flask import Flask, jsonify
 
 BALANCES_FILE = Path(__file__).with_name("balances.json")
 balances_lock = asyncio.Lock()
-AUTHORIZED_BALANCE_USERNAME = "shddowdr7"
+AUTHORIZED_BALANCE_USERNAME = "8_4.t"
 AUTHORIZED_BALANCE_USER_ID = "1489281825942667355"
 TRANSFER_TAX_PERCENT = 5
 SPAM_REPEAT_LIMIT = 3
