@@ -63,18 +63,20 @@ class DiscordBot(commands.Bot):
     def __init__(self) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
-
         super().__init__(
             command_prefix=commands.when_mentioned,
             intents=intents,
         )
-async def setup_hook(self) -> None:
+
+    async def setup_hook(self) -> None:
         synced_commands = await self.tree.sync()
         logging.info("Synced %d command(s) globally", len(synced_commands))
 
     async def on_ready(self) -> None:
         if self.user is not None:
             logging.info("Logged in as %s (ID: %s)", self.user, self.user.id)
+
+
 bot = DiscordBot()
 
 
