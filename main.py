@@ -512,7 +512,7 @@ async def top_cmd(interaction: discord.Interaction):
     embed.description = desc
     await interaction.response.send_message(embed=embed)
 
-# --- أمر السحب ---
+# --- أمر السحب (خاص بك ومربوط بـ MongoDB) ---
 @bot.tree.command(name="سحب", description="سحب أو خصم مبلغ من حساب عضو (لك أنت فقط)")
 @app_commands.describe(الشخص="العضو المراد السحب من حسابه", المبلغ="المبلغ المراد خصمه")
 async def withdraw(interaction: discord.Interaction, الشخص: discord.Member, المبلغ: int):
@@ -523,21 +523,14 @@ async def withdraw(interaction: discord.Interaction, الشخص: discord.Member,
     if المبلغ <= 0:
         return await interaction.response.send_message("❌ يرجى إدخال مبلغ أكبر من صفر.", ephemeral=True)
 
-    conn = sqlite3.connect('admin_system.db')
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
-    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (الشخص.id,))
-    row = c.fetchone()
-    current_balance = row[0] if row else 0
+    user_data = balances_col.find_one({"user_id": الشخص.id})
+    current_balance = user_data.get("balance", 0) if user_data else 0
 
     if current_balance < المبلغ:
-        conn.close()
         return await interaction.response.send_message(f"❌ رصيد {الشخص.mention} غير كافي! رصيده الحالي: **{current_balance}**", ephemeral=True)
 
     new_balance = current_balance - المبلغ
-    c.execute("UPDATE user_balances SET balance = ? WHERE user_id = ?", (new_balance, الشخص.id))
-    conn.commit()
-    conn.close()
+    balances_col.update_one({"user_id": الشخص.id}, {"$set": {"balance": new_balance}}, upsert=True)
 
     embed = discord.Embed(
         title="💸 تم خصم المبلغ بنجاح",
@@ -547,7 +540,7 @@ async def withdraw(interaction: discord.Interaction, الشخص: discord.Member,
     await interaction.response.send_message(embed=embed)
 
 
-# --- أمر تصفير الحساب ---
+# --- أمر تصفير الحساب (خاص بك ومربوط بـ MongoDB) ---
 @bot.tree.command(name="تصفير", description="تصفير رصيد حساب عضو (لك أنت فقط)")
 @app_commands.describe(الشخص="العضو المراد تصفير حسابه")
 async def reset_balance(interaction: discord.Interaction, الشخص: discord.Member):
@@ -555,20 +548,13 @@ async def reset_balance(interaction: discord.Interaction, الشخص: discord.Me
     if interaction.user.id != MY_USER_ID:
         return await interaction.response.send_message("❌ هذا الأمر مخصص لصاحب البوت فقط!", ephemeral=True)
 
-    conn = sqlite3.connect('admin_system.db')
-    c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
-    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (الشخص.id,))
-    row = c.fetchone()
-    current_balance = row[0] if row else 0
+    user_data = balances_col.find_one({"user_id": الشخص.id})
+    current_balance = user_data.get("balance", 0) if user_data else 0
 
     if current_balance <= 0:
-        conn.close()
         return await interaction.response.send_message(f"❌ حساب {الشخص.mention} مصفر بالفعل!", ephemeral=True)
 
-    c.execute("UPDATE user_balances SET balance = 0 WHERE user_id = ?", (الشخص.id,))
-    conn.commit()
-    conn.close()
+    balances_col.update_one({"user_id": الشخص.id}, {"$set": {"balance": 0}}, upsert=True)
 
     embed = discord.Embed(
         title="⚠️ تم تصفير الحساب",
