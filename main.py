@@ -514,8 +514,7 @@ async def top_cmd(interaction: discord.Interaction):
 
 
 
-
-# --- امر السحب ---
+# --- أمر السحب (لك أنت فقط) ---
 @bot.tree.command(name="سحب", description="سحب أو خصم مبلغ من حساب عضو (لك أنت فقط)")
 @app_commands.describe(الشخص="العضو المراد السحب من حسابه", المبلغ="المبلغ المراد خصمه")
 async def withdraw(interaction: discord.Interaction, الشخص: discord.Member, المبلغ: int):
@@ -552,28 +551,34 @@ async def withdraw(interaction: discord.Interaction, الشخص: discord.Member,
     await interaction.response.send_message(embed=embed)
 
 
-@bot.tree.command(name="تصفير", description="سحب كامل المبلغ وتصفير الحساب")
-async def reset_balance(interaction: discord.Interaction):
-    user_id = interaction.user.id
+# --- أمر تصفير الحساب (لك أنت فقط) ---
+@bot.tree.command(name="تصفير", description="تصفير رصيد حساب عضو (لك أنت فقط)")
+@app_commands.describe(الشخص="العضو المراد تصفير حسابه")
+async def reset_balance(interaction: discord.Interaction, الشخص: discord.Member):
+    MY_USER_ID = 1489281825942667355
+    
+    if interaction.user.id != MY_USER_ID:
+        return await interaction.response.send_message("❌ هذا الأمر مخصص لصاحب البوت فقط!", ephemeral=True)
+
     conn = sqlite3.connect('admin_system.db')
     c = conn.cursor()
 
     c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
-    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (user_id,))
+    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (الشخص.id,))
     row = c.fetchone()
     current_balance = row[0] if row else 0
 
     if current_balance <= 0:
         conn.close()
-        return await interaction.response.send_message("❌ حسابك مصفّر بالفعل وليس لديك أي رصيد للسحب!", ephemeral=True)
+        return await interaction.response.send_message(f"❌ حساب {الشخص.mention} مصفر بالفعل!", ephemeral=True)
 
-    c.execute("UPDATE user_balances SET balance = 0 WHERE user_id = ?", (user_id,))
+    c.execute("UPDATE user_balances SET balance = 0 WHERE user_id = ?", (الشخص.id,))
     conn.commit()
     conn.close()
 
     embed = discord.Embed(
         title="⚠️ تم تصفير الحساب",
-        description=f"تم سحب كامل رصيدك وقدره **{current_balance}** بنجاح.\nرصيدك الحالي أصبح: **0**",
+        description=f"تم تصفير رصيد {الشخص.mention} بالكامل (كان لديه **{current_balance}**).",
         color=discord.Color.red()
     )
     await interaction.response.send_message(embed=embed)
