@@ -514,40 +514,42 @@ async def top_cmd(interaction: discord.Interaction):
 
 
 
-# --- أوامر السحب والتصفير ---
-@bot.tree.command(name="سحب", description="سحب مبلغ معين من حسابك")
-@app_commands.describe(المبلغ="المبلغ المراد سحبه")
-async def withdraw(interaction: discord.Interaction, المبلغ: int):
-    user_id = interaction.user.id
+# --- أمر السحب (خاص بـ ID حسابك فقط) ---
+@bot.tree.command(name="سحب", description="سحب أو خصم مبلغ من حساب عضو (لك أنت فقط)")
+@app_commands.describe(الشخص="العضو المراد السحب من حسابه", المبلغ="المبلغ المراد خصمه")
+async def withdraw(interaction: discord.Interaction, الشخص: discord.Member, المبلغ: int):
+    # مخصص فقط لحسابك عبر الـ ID الخاص بك
+    MY_USER_ID = 1489281825942667355
+    
+    if interaction.user.id != MY_USER_ID:
+        return await interaction.response.send_message("❌ هذا الأمر مخصص لصاحب البوت فقط!", ephemeral=True)
+
+    if المبلغ <= 0:
+        return await interaction.response.send_message("❌ يرجى إدخال مبلغ أكبر من صفر.", ephemeral=True)
+
     conn = sqlite3.connect('admin_system.db')
     c = conn.cursor()
     
-    # التأكد من وجود جدول للأرصدة أو إنشائه
     c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
-    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (user_id,))
+    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (الشخص.id,))
     row = c.fetchone()
     current_balance = row[0] if row else 0
 
-    if المبلغ <= 0:
-        conn.close()
-        return await interaction.response.send_message("❌ يرجى إدخال مبلغ أكبر من صفر.", ephemeral=True)
-
     if current_balance < المبلغ:
         conn.close()
-        return await interaction.response.send_message(f"❌ رصيدك غير كافي! رصيدك الحالي هو: **{current_balance}**", ephemeral=True)
+        return await interaction.response.send_message(f"❌ رصيد {الشخص.mention} غير كافي! رصيده الحالي: **{current_balance}**", ephemeral=True)
 
     new_balance = current_balance - المبلغ
-    c.execute("UPDATE user_balances SET balance = ? WHERE user_id = ?", (new_balance, user_id))
+    c.execute("UPDATE user_balances SET balance = ? WHERE user_id = ?", (new_balance, الشخص.id))
     conn.commit()
     conn.close()
 
     embed = discord.Embed(
-        title="💸 عملية سحب ناجحة",
-        description=f"تم سحب **{المبلغ}** من حسابك بنجاح.\nالمتبقي في حسابك: **{new_balance}**",
-        color=discord.Color.green()
+        title="💸 تم خصم المبلغ بنجاح",
+        description=f"تم سحب **{المبلغ}** من حساب {الشخص.mention}.\nالرصيد المتبقي له: **{new_balance}**",
+        color=discord.Color.orange()
     )
     await interaction.response.send_message(embed=embed)
-
 
 @bot.tree.command(name="تصفير", description="سحب كامل المبلغ وتصفير الحساب")
 async def reset_balance(interaction: discord.Interaction):
