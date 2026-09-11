@@ -512,14 +512,11 @@ async def top_cmd(interaction: discord.Interaction):
     embed.description = desc
     await interaction.response.send_message(embed=embed)
 
-
-
-# --- أمر السحب (لك أنت فقط) ---
+# --- أمر السحب ---
 @bot.tree.command(name="سحب", description="سحب أو خصم مبلغ من حساب عضو (لك أنت فقط)")
 @app_commands.describe(الشخص="العضو المراد السحب من حسابه", المبلغ="المبلغ المراد خصمه")
 async def withdraw(interaction: discord.Interaction, الشخص: discord.Member, المبلغ: int):
     MY_USER_ID = 1489281825942667355
-    
     if interaction.user.id != MY_USER_ID:
         return await interaction.response.send_message("❌ هذا الأمر مخصص لصاحب البوت فقط!", ephemeral=True)
 
@@ -528,7 +525,6 @@ async def withdraw(interaction: discord.Interaction, الشخص: discord.Member,
 
     conn = sqlite3.connect('admin_system.db')
     c = conn.cursor()
-    
     c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
     c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (الشخص.id,))
     row = c.fetchone()
@@ -551,18 +547,16 @@ async def withdraw(interaction: discord.Interaction, الشخص: discord.Member,
     await interaction.response.send_message(embed=embed)
 
 
-# --- أمر تصفير الحساب (لك أنت فقط) ---
+# --- أمر تصفير الحساب ---
 @bot.tree.command(name="تصفير", description="تصفير رصيد حساب عضو (لك أنت فقط)")
 @app_commands.describe(الشخص="العضو المراد تصفير حسابه")
 async def reset_balance(interaction: discord.Interaction, الشخص: discord.Member):
     MY_USER_ID = 1489281825942667355
-    
     if interaction.user.id != MY_USER_ID:
         return await interaction.response.send_message("❌ هذا الأمر مخصص لصاحب البوت فقط!", ephemeral=True)
 
     conn = sqlite3.connect('admin_system.db')
     c = conn.cursor()
-
     c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
     c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (الشخص.id,))
     row = c.fetchone()
