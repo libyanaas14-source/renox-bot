@@ -17,7 +17,12 @@ import sqlite3
 from flask import Flask, jsonify
 
 
-BALANCES_FILE = Path(__file__).with_name("balances.json")
+import pymongo
+
+MONGO_URI = "mongodb+srv://libyanaas14_db_user:xQlVwDV7UWq9ZqC7@cluster0.4mns0fn.mongodb.net/?appName=Cluster0"
+mongo_client = pymongo.MongoClient(MONGO_URI)
+db = mongo_client["renox_database"]
+balances_col = db["balances"]
 balances_lock = asyncio.Lock()
 AUTHORIZED_BALANCE_USERNAME = "8_4.t"
 AUTHORIZED_BALANCE_USER_ID = "1489281825942667355"
@@ -182,53 +187,25 @@ def start_keep_alive_server() -> None:
     logging.info("Keep-alive server starting on port %d", KEEP_ALIVE_PORT)
 
 
-def load_balances() -> dict[str, int]:
-    """Load balances keyed by Discord user ID from the JSON data file."""
-    if not BALANCES_FILE.exists():
-        return {}
 
-    try:
-        with BALANCES_FILE.open("r", encoding="utf-8") as file:
-            data = json.load(file)
-    except (OSError, json.JSONDecodeError) as error:
-        raise RuntimeError(f"Could not read {BALANCES_FILE.name}") from error
-
-    if not isinstance(data, dict):
-        raise RuntimeError(f"{BALANCES_FILE.name} must contain a JSON object")
-
-    balances: dict[str, int] = {}
-    for user_id, amount in data.items():
-        if (
-            not isinstance(user_id, str)
-            or isinstance(amount, bool)
-            or not isinstance(amount, int)
-            or amount < 0
-        ):
-            raise RuntimeError(
-                f"Invalid balance entry for {user_id!r}; balances must be non-negative integers"
-            )
-        balances[user_id] = amount
-
-    return balances
-
-
-def save_balances(balances: dict[str, int]) -> None:
-    """Persist balances atomically so a transfer cannot leave partial JSON."""
-    temporary_file = BALANCES_FILE.with_suffix(".json.tmp")
-
-    try:
-        with temporary_file.open("w", encoding="utf-8") as file:
-            json.dump(balances, file, ensure_ascii=False, indent=2)
-            file.write("\n")
-        temporary_file.replace(BALANCES_FILE)
-    except OSError as error:
-        raise RuntimeError(f"Could not write {BALANCES_FILE.name}") from error
-
-
-@bot.tree.command(name="ping", description="Check whether the bot is online.")
+bot.tree.command(name="ping", description="Check whether the bot is online.")
 async def ping(interaction: discord.Interaction) -> None:
     latency_ms = round(bot.latency * 1000)
-    await interaction.response.send_message(f"Pong! {latency_ms} ms")
+    await interaction.response.send_message(f"Pong! ({latency_ms} ms)")
+
+def load_balances() -> dict[str, int]:
+    balances = {}
+    for doc in balances_col.find():
+        balances[str(doc["_id"])] = doc.get("balance", 0)
+    return balances
+
+def save_balances(balances: dict[str, int]) -> None:
+    for user_id, amount in balances.items():
+        balances_col.update_one(
+            {"_id": str(user_id)},
+            {"$set": {"balance": amount}},
+            upsert=True
+        )
 
 
 @bot.tree.command(name="رصيد", description="Display your رينو balance.")
