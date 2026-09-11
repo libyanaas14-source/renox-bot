@@ -2,5 +2,3 @@ discord.py
 flask
 pymongo
 dnspython
-pysync
- 
