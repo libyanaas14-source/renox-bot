@@ -514,11 +514,11 @@ async def top_cmd(interaction: discord.Interaction):
 
 
 
-# --- أمر السحب (خاص بـ ID حسابك فقط) ---
+
+# --- امر السحب ---
 @bot.tree.command(name="سحب", description="سحب أو خصم مبلغ من حساب عضو (لك أنت فقط)")
 @app_commands.describe(الشخص="العضو المراد السحب من حسابه", المبلغ="المبلغ المراد خصمه")
 async def withdraw(interaction: discord.Interaction, الشخص: discord.Member, المبلغ: int):
-    # مخصص فقط لحسابك عبر الـ ID الخاص بك
     MY_USER_ID = 1489281825942667355
     
     if interaction.user.id != MY_USER_ID:
@@ -550,6 +550,7 @@ async def withdraw(interaction: discord.Interaction, الشخص: discord.Member,
         color=discord.Color.orange()
     )
     await interaction.response.send_message(embed=embed)
+
 
 @bot.tree.command(name="تصفير", description="سحب كامل المبلغ وتصفير الحساب")
 async def reset_balance(interaction: discord.Interaction):
