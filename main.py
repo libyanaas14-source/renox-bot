@@ -514,6 +514,67 @@ async def top_cmd(interaction: discord.Interaction):
 
 
 
+# --- أوامر السحب والتصفير ---
+@bot.tree.command(name="سحب", description="سحب مبلغ معين من حسابك")
+@app_commands.describe(المبلغ="المبلغ المراد سحبه")
+async def withdraw(interaction: discord.Interaction, المبلغ: int):
+    user_id = interaction.user.id
+    conn = sqlite3.connect('admin_system.db')
+    c = conn.cursor()
+    
+    # التأكد من وجود جدول للأرصدة أو إنشائه
+    c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
+    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    current_balance = row[0] if row else 0
+
+    if المبلغ <= 0:
+        conn.close()
+        return await interaction.response.send_message("❌ يرجى إدخال مبلغ أكبر من صفر.", ephemeral=True)
+
+    if current_balance < المبلغ:
+        conn.close()
+        return await interaction.response.send_message(f"❌ رصيدك غير كافي! رصيدك الحالي هو: **{current_balance}**", ephemeral=True)
+
+    new_balance = current_balance - المبلغ
+    c.execute("UPDATE user_balances SET balance = ? WHERE user_id = ?", (new_balance, user_id))
+    conn.commit()
+    conn.close()
+
+    embed = discord.Embed(
+        title="💸 عملية سحب ناجحة",
+        description=f"تم سحب **{المبلغ}** من حسابك بنجاح.\nالمتبقي في حسابك: **{new_balance}**",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="تصفير", description="سحب كامل المبلغ وتصفير الحساب")
+async def reset_balance(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    conn = sqlite3.connect('admin_system.db')
+    c = conn.cursor()
+
+    c.execute("CREATE TABLE IF NOT EXISTS user_balances (user_id INTEGER PRIMARY KEY, balance INTEGER DEFAULT 0)")
+    c.execute("SELECT balance FROM user_balances WHERE user_id = ?", (user_id,))
+    row = c.fetchone()
+    current_balance = row[0] if row else 0
+
+    if current_balance <= 0:
+        conn.close()
+        return await interaction.response.send_message("❌ حسابك مصفّر بالفعل وليس لديك أي رصيد للسحب!", ephemeral=True)
+
+    c.execute("UPDATE user_balances SET balance = 0 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+    embed = discord.Embed(
+        title="⚠️ تم تصفير الحساب",
+        description=f"تم سحب كامل رصيدك وقدره **{current_balance}** بنجاح.\nرصيدك الحالي أصبح: **0**",
+        color=discord.Color.red()
+    )
+    await interaction.response.send_message(embed=embed)
+
 def main() -> None:
     token = os.getenv("DISCORD_BOT_TOKEN")
     if not token:
