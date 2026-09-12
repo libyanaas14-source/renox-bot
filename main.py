@@ -20,8 +20,8 @@ from flask import Flask, jsonify
 
 MONGO_URI = "mongodb+srv://libyanaas14_db_user:xQlVwDV7UWq9ZqC7@cluster0.4mns0fn.mongodb.net/?appName=Cluster0"
 mongo_client = pymongo.MongoClient(MONGO_URI)
-db = mongo_client["renox_database"]
-balances_col = db["balances"]
+mango = mongo_client["renox_database"]
+balances_col = mango["balances"]
 balances_lock = asyncio.Lock()
 AUTHORIZED_BALANCE_USERNAME = "8_4.t"
 AUTHORIZED_BALANCE_USER_ID = "1489281825942667355"
