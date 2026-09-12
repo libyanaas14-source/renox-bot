@@ -17,7 +17,6 @@ import sqlite3
 from flask import Flask, jsonify
 
 
-import pymongo
 
 MONGO_URI = "mongodb+srv://libyanaas14_db_user:xQlVwDV7UWq9ZqC7@cluster0.4mns0fn.mongodb.net/?appName=Cluster0"
 mongo_client = pymongo.MongoClient(MONGO_URI)
